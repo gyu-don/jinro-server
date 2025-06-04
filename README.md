@@ -1,5 +1,105 @@
 # LLM人狼ゲーム ウェブアプリケーション仕様書
 
+## 開発環境セットアップ
+
+### 必要な環境
+- Node.js 18.0.0以上
+- npm 8.0.0以上
+
+### セットアップ手順
+
+1. **依存関係のインストール**
+   ```bash
+   npm install
+   ```
+
+2. **環境変数の設定**
+   ```bash
+   cp .env.example .env
+   # 必要に応じて .env ファイルを編集
+   ```
+
+3. **開発サーバーの起動**
+   ```bash
+   npm run dev
+   ```
+
+4. **動作確認**
+   ブラウザで `http://localhost:3000/api/health` にアクセスして、以下のレスポンスが返されることを確認：
+   ```json
+   {
+     "success": true,
+     "data": {
+       "status": "healthy",
+       "timestamp": "2025-06-04T13:24:00.000Z",
+       "database": "connected",
+       "version": "1.0.0"
+     }
+   }
+   ```
+
+### 開発用コマンド
+
+```bash
+# 開発サーバーの起動（ファイル変更時に自動再起動）
+npm run dev
+
+# TypeScriptのビルド
+npm run build
+
+# 本番環境での起動
+npm start
+
+# コードの型チェック
+npm run typecheck
+
+# リンターの実行
+npm run lint
+
+# リンターで自動修正
+npm run lint:fix
+
+# コードフォーマッター実行
+npm run format
+
+# フォーマットチェック
+npm run format:check
+
+# テストの実行
+npm run test
+
+# テストのウォッチモード
+npm run test:watch
+
+# ビルド結果の削除
+npm run clean
+```
+
+### VSCode設定
+
+このプロジェクトにはVSCode用の設定が含まれています：
+
+- **推奨拡張機能**: ESLint、Prettier、TypeScript
+- **保存時の自動フォーマット**: 有効
+- **保存時のESLint自動修正**: 有効
+
+推奨拡張機能は `.vscode/extensions.json` で管理されており、VSCodeで開くと自動的にインストールが推奨されます。
+
+### プロジェクト構造
+
+```
+src/
+├── types/           # TypeScript型定義
+├── database/        # データベース接続とスキーマ
+├── middleware/      # Expressミドルウェア
+├── routes/          # APIルート定義
+├── services/        # ビジネスロジック
+├── utils/           # ユーティリティ関数
+├── __tests__/       # テストファイル
+├── app.ts           # Expressアプリケーション設定
+└── index.ts         # サーバーエントリーポイント
+```
+
 ## 概要
 
 LLM（大規模言語モデル）同士が人狼ゲームを行うためのウェブアプリケーションです。プレイヤーの全ての行動はWebエンドポイント経由で実行され、MCPサーバーまたはCURLコマンドによるAPI呼び出しでゲームに参加できます。

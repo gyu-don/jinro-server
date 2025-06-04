@@ -1,101 +1,80 @@
-// Database connection and setup for SQLite
+import sqlite3 from 'sqlite3';
+import { promisify } from 'util';
 
-import Database from 'better-sqlite3';
-import path from 'path';
-import fs from 'fs';
+export class Database {
+  private db: sqlite3.Database;
 
-const DB_PATH = process.env.DATABASE_PATH || path.join(process.cwd(), 'jinro.db');
-const MIGRATIONS_PATH = path.join(process.cwd(), 'migrations');
-
-export class DatabaseConnection {
-  private db: Database.Database;
-  private static instance: DatabaseConnection;
-
-  private constructor() {
-    this.db = new Database(DB_PATH);
-    this.db.pragma('journal_mode = WAL');
-    this.db.pragma('foreign_keys = ON');
-    this.initialize();
+  constructor(filename: string = ':memory:') {
+    this.db = new sqlite3.Database(filename);
   }
 
-  public static getInstance(): DatabaseConnection {
-    if (!DatabaseConnection.instance) {
-      DatabaseConnection.instance = new DatabaseConnection();
-    }
-    return DatabaseConnection.instance;
-  }
-
-  public getDatabase(): Database.Database {
-    return this.db;
-  }
-
-  private initialize(): void {
-    this.createMigrationsTable();
-    this.runMigrations();
-  }
-
-  private createMigrationsTable(): void {
-    const sql = `
-      CREATE TABLE IF NOT EXISTS migrations (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        filename TEXT UNIQUE NOT NULL,
-        applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  async initialize(): Promise<void> {
+    const run = promisify(this.db.run.bind(this.db));
+    
+    await run(`
+      CREATE TABLE IF NOT EXISTS games (
+        id TEXT PRIMARY KEY,
+        game_data TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
-    `;
-    this.db.exec(sql);
+    `);
+
+    await run(`
+      CREATE TABLE IF NOT EXISTS messages (
+        id TEXT PRIMARY KEY,
+        game_id TEXT NOT NULL,
+        message_data TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (game_id) REFERENCES games (id)
+      )
+    `);
+
+    await run(`
+      CREATE TABLE IF NOT EXISTS actions (
+        id TEXT PRIMARY KEY,
+        game_id TEXT NOT NULL,
+        action_data TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (game_id) REFERENCES games (id)
+      )
+    `);
   }
 
-  private runMigrations(): void {
-    if (!fs.existsSync(MIGRATIONS_PATH)) {
-      return;
-    }
-
-    const migrationFiles = fs
-      .readdirSync(MIGRATIONS_PATH)
-      .filter(file => file.endsWith('.sql'))
-      .sort();
-
-    const appliedMigrations = this.db
-      .prepare('SELECT filename FROM migrations')
-      .all() as { filename: string }[];
-
-    const appliedSet = new Set(appliedMigrations.map(m => m.filename));
-
-    for (const filename of migrationFiles) {
-      if (!appliedSet.has(filename)) {
-        console.log(`Applying migration: ${filename}`);
-        const migrationPath = path.join(MIGRATIONS_PATH, filename);
-        const migrationSql = fs.readFileSync(migrationPath, 'utf-8');
-        
-        this.db.transaction(() => {
-          this.db.exec(migrationSql);
-          this.db
-            .prepare('INSERT INTO migrations (filename) VALUES (?)')
-            .run(filename);
-        })();
-        
-        console.log(`Migration applied: ${filename}`);
-      }
-    }
+  async run(sql: string, params?: unknown[]): Promise<void> {
+    const run = promisify(this.db.run.bind(this.db));
+    await run(sql, params);
   }
 
-  public close(): void {
-    this.db.close();
+  async get<T>(sql: string, params?: unknown[]): Promise<T | undefined> {
+    const get = promisify(this.db.get.bind(this.db));
+    return get(sql, params) as Promise<T | undefined>;
   }
 
-  // Helper methods for common database operations
-  public transaction<T>(fn: () => T): T {
-    return this.db.transaction(fn)();
+  async all<T>(sql: string, params?: unknown[]): Promise<T[]> {
+    const all = promisify(this.db.all.bind(this.db));
+    return all(sql, params) as Promise<T[]>;
   }
 
-  public prepare(sql: string) {
-    return this.db.prepare(sql);
-  }
-
-  public exec(sql: string): void {
-    this.db.exec(sql);
+  close(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.db.close(err => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    });
   }
 }
 
-// Export singleton instance
-export const dbConnection = DatabaseConnection.getInstance();
+let dbInstance: Database | null = null;
+
+export const getDatabase = (): Database => {
+  if (!dbInstance) {
+    const dbPath = process.env.DATABASE_PATH || 'jinro.db';
+    dbInstance = new Database(dbPath);
+  }
+  return dbInstance;
+};
