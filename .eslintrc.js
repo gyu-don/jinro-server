@@ -10,6 +10,7 @@ module.exports = {
     'eslint:recommended',
     '@typescript-eslint/recommended',
     '@typescript-eslint/recommended-requiring-type-checking',
+    'prettier',
   ],
   rules: {
     '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
